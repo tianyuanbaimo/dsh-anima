@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "title": {
+    "en": "dsh-anima",
+    "zh": "dsh-anima"
+  },
+  "description": {
+    "en": "Persistent persona and long-term memory that survive restarts, new sessions and compaction.",
+    "zh": "跨重启、跨会话持久的人格与长期记忆。"
+  },
+  "metadata": {
+    "categories": {
+      "memory": {
+        "title": {
+          "en": "Memory",
+          "zh": "记忆"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-anima",
+      "title": {
+        "en": "dsh-anima",
+        "zh": "dsh-anima · 记忆与人格"
+      },
+      "description": {
+        "en": "Give DSH a soul: persona and long-term memory that survive restarts and new sessions.",
+        "zh": "给 DSH 一个灵魂：关机、重启、换会话之后，它还是它。"
+      },
+      "author": "白渊 (Bai Yuan)",
+      "homepage": "https://github.com/tianyuanbaimo/dsh-anima#readme",
+      "repository": {
+        "url": "https://github.com/tianyuanbaimo/dsh-anima"
+      },
+      "metadata": {
+        "category": "memory",
+        "keywords": [
+          "dsh",
+          "dsh-plugin",
+          "deepseek-harness",
+          "memory",
+          "persona",
+          "long-term-memory",
+          "continuity",
+          "anima"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1792897454,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        }
+      ]
+    }
+  ]
+}

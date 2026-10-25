@@ -1,0 +1,13 @@
+# runtime data (never commit a soul)
+data/
+*.jsonl
+*.log
+.tmp/
+node_modules/
+pnpm-lock.yaml
+.DS_Store
+Thumbs.db
+
+# publishing credentials — never commit
+.publish-tokens.json
+*.tgz

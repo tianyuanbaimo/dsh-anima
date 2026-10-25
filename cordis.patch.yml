@@ -1,0 +1,29 @@
+# dsh-anima bundle patch
+#
+# This layer inserts the plugin row into a profile's plugin roster; it is
+# declared by package.json `dsh.bundle.patch`. The row `name` is the package
+# name: the host half comes from exports["."] (lib/index.js) and runs inside the
+# DSH process. There is no client half, so `dsh.client` is not declared.
+#
+# Every own config key is listed here, so a later layer can override a single
+# key and keep the rest of these defaults:
+#   inject           inject "persona + memory" into the system prompt
+#   promptMaxChars   character budget of the injected block
+#   injectMemories   how many memories stay resident in every request
+#   injectEpisodes   how many recent episodes stay resident
+#   captureEpisodes  compress finished turns into episodes
+#   captureCues      promote explicit cues ("remember this", "I prefer…") to long-term memory
+#   sectionOrder     position of the soul block in the system prompt (10050: after host docs, before Web surface)
+#   dataDir          data directory, default ~/.dsh/anima ($DSH_HOME wins)
+- insert:
+    - id: soul
+      name: dsh-anima
+      config:
+        inject: true
+        promptMaxChars: 4000
+        injectMemories: 24
+        injectEpisodes: 6
+        captureEpisodes: true
+        captureCues: true
+        sectionOrder: 10050
+        dataDir: ""
