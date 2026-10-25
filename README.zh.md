@@ -28,19 +28,25 @@ DSH 原生的一切状态都属于「会话」：换会话、重启、上下文�
 1. 打开 **插件 → 发现 → 索引源（Index sources）**
 2. 添加：
    ```
-   https://cdn.jsdelivr.net/npm/dsh-anima/market/index.json
+   https://raw.githubusercontent.com/tianyuanbaimo/dsh-anima/main/market/index.json
    ```
 3. 在「发现」里找到 **dsh-anima**，点安装。
+
+`raw.githubusercontent.com` 每次都取最新内容；想要可复现的固定版本，把 URL 换成 jsDelivr 的 commit 固定形式：
+
+```
+https://cdn.jsdelivr.net/gh/tianyuanbaimo/dsh-anima@<commit>/market/index.json
+```
+
+> 注意：索引里用的是 **git 源**，安装时 pnpm 需要调用 `git`。没装 git 的机器请先装 Git for Windows（或把便携版 MinGit 的 `cmd` 目录加进 PATH）。
 
 ### 从命令行
 
 ```sh
-dsh plugin --profile web add dsh-anima
-```
+# git 源（无需 npm 发布）
+dsh plugin --profile desktop add "git+https://github.com/tianyuanbaimo/dsh-anima.git#<commit>"
 
-桌面端用自己的 profile（常见是 `desktop`）：
-
-```sh
+# npm 发布之后
 dsh plugin --profile desktop add dsh-anima
 ```
 

@@ -24,15 +24,23 @@ In stock DSH, persona and memory belong to a session. A new session, a restart, 
 From the plugin market: **Plugins → Discover → Index sources**, add
 
 ```
-https://cdn.jsdelivr.net/npm/dsh-anima/market/index.json
+https://raw.githubusercontent.com/tianyuanbaimo/dsh-anima/main/market/index.json
 ```
 
-then install **dsh-anima** from Discover.
+then install **dsh-anima** from Discover. For a pinned, reproducible index use
+`https://cdn.jsdelivr.net/gh/tianyuanbaimo/dsh-anima@<commit>/market/index.json`.
+
+The index installs from a **git source**, so `git` must be on PATH (Git for Windows or a
+portable MinGit).
 
 From a shell:
 
 ```sh
-dsh plugin --profile web add dsh-anima
+# git source (no npm release needed)
+dsh plugin --profile desktop add "git+https://github.com/tianyuanbaimo/dsh-anima.git#<commit>"
+
+# once published to npm
+dsh plugin --profile desktop add dsh-anima
 ```
 
 From a source checkout (development):
