@@ -51,7 +51,8 @@ async function token() {
 const tokenValue = await token()
 
 async function api(method, route, body, { allow404 = false } = {}) {
-  const res = await fetch(route.startsWith('http') ? route : `${API}${route}`, {
+  const url = route.startsWith('http') ? route : `${API}${route}`
+  const init = {
     method,
     headers: {
       authorization: `Bearer ${tokenValue}`,
@@ -61,7 +62,19 @@ async function api(method, route, body, { allow404 = false } = {}) {
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
-  })
+    signal: AbortSignal.timeout(60000),
+  }
+  let res
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      res = await fetch(url, init)
+      break
+    } catch (err) {
+      // 本机直连 api.github.com 会偶发 CONNECT_TIMEOUT，重试比整个推送重来便宜
+      if (attempt === 4) throw err
+      await new Promise((r) => setTimeout(r, 2000 * attempt))
+    }
+  }
   if (allow404 && res.status === 404) return null
   const text = await res.text()
   if (!res.ok) throw new Error(`${method} ${route} → HTTP ${res.status}: ${text.slice(0, 600)}`)

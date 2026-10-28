@@ -1,57 +1,57 @@
 {
-  "name": "dsh-anima",
-  "version": "0.1.0",
-  "description": "Give DeepSeek Harness a soul: persona and long-term memory that survive restarts, new sessions and context compaction. 给 DSH 一个灵魂：跨重启、跨会话持久的人格与记忆。",
-  "type": "module",
-  "main": "./lib/index.js",
-  "exports": {
-    ".": "./lib/index.js",
-    "./package.json": "./package.json",
-    "./market/index.json": "./market/index.json"
-  },
-  "files": [
-    "lib",
-    "market",
-    "cordis.patch.yml",
-    "docs",
-    "README.md",
-    "README.zh.md",
-    "CHANGELOG.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "test": "node scripts/smoke.mjs",
-    "index": "node scripts/make-index.mjs"
-  },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "compatibility": {
-      "dshReleases": ">=0.2.0"
-    }
-  },
-  "keywords": [
-    "dsh",
-    "dsh-plugin",
-    "deepseek-harness",
-    "memory",
-    "persona",
-    "long-term-memory",
-    "continuity",
-    "anima"
-  ],
-  "author": "白渊 (Bai Yuan)",
-  "license": "MIT",
-  "homepage": "https://github.com/tianyuanbaimo/dsh-anima#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/tianyuanbaimo/dsh-anima.git"
-  },
-  "bugs": {
-    "url": "https://github.com/tianyuanbaimo/dsh-anima/issues"
-  },
-  "engines": {
-    "node": ">=22"
-  }
+    "name":  "dsh-anima",
+    "version":  "0.3.0",
+    "description":  "Give DeepSeek Harness a soul: persona and long-term memory that survive restarts, new sessions and context compaction. 给 DSH 一个灵魂：跨重启、跨会话持久的人格与记忆。",
+    "type":  "module",
+    "main":  "./lib/index.js",
+    "exports":  {
+                    ".":  "./lib/index.js",
+                    "./package.json":  "./package.json",
+                    "./market/index.json":  "./market/index.json"
+                },
+    "files":  [
+                  "lib",
+                  "market",
+                  "cordis.patch.yml",
+                  "docs",
+                  "README.md",
+                  "README.zh.md",
+                  "CHANGELOG.md",
+                  "LICENSE"
+              ],
+    "scripts":  {
+                    "test":  "node scripts/smoke.mjs",
+                    "index":  "node scripts/make-index.mjs"
+                },
+    "dsh":  {
+                "bundle":  {
+                               "patch":  "./cordis.patch.yml"
+                           },
+                "compatibility":  {
+                                      "dshReleases":  "\u003e=0.2.0"
+                                  }
+            },
+    "keywords":  [
+                     "dsh",
+                     "dsh-plugin",
+                     "deepseek-harness",
+                     "memory",
+                     "persona",
+                     "long-term-memory",
+                     "continuity",
+                     "anima"
+                 ],
+    "author":  "白渊 (Bai Yuan)",
+    "license":  "MIT",
+    "homepage":  "https://github.com/tianyuanbaimo/dsh-anima#readme",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "git+https://github.com/tianyuanbaimo/dsh-anima.git"
+                   },
+    "bugs":  {
+                 "url":  "https://github.com/tianyuanbaimo/dsh-anima/issues"
+             },
+    "engines":  {
+                    "node":  "\u003e=22"
+                }
 }

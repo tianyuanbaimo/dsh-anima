@@ -37,7 +37,7 @@ async function token() {
   const file = flag('--token-file')
   if (file) {
     const raw = JSON.parse(await fs.readFile(file, 'utf8'))
-    const t = raw.npm ?? raw.NPM ?? raw.npmToken
+    const t = raw.npm ?? raw.NPM ?? raw.npmToken ?? raw.token
     if (t) return String(t).trim()
   }
   if (process.env.NPM_TOKEN) return process.env.NPM_TOKEN.trim()
@@ -157,6 +157,8 @@ const res = await fetch(`${registry}/${pkg.name}`, {
     'npm-auth-type': 'legacy',
     'npm-command': 'publish',
     'user-agent': 'dsh-anima-publisher/1.0',
+    // 账号开了 2FA 时，npm 要求带上一次性验证码
+    ...(flag('--otp') ? { 'npm-otp': String(flag('--otp')) } : {}),
   },
   body: JSON.stringify(body),
 })

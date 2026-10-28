@@ -32,17 +32,28 @@ const scope = flag('--scope') ?? 'repo,read:user'
 const tokenFile = path.resolve(flag('--token-file') ?? path.join(root, '.publish-tokens.json'))
 
 async function post(url, form) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(form).toString(),
-  })
-  const text = await res.text()
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { error: 'bad_response', error_description: text.slice(0, 300) }
+  let lastErr
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(form).toString(),
+        signal: AbortSignal.timeout(20000),
+      })
+      const text = await res.text()
+      try {
+        return JSON.parse(text)
+      } catch {
+        return { error: 'bad_response', error_description: text.slice(0, 300) }
+      }
+    } catch (err) {
+      lastErr = err
+      // 本机直连 github.com 会偶发超时；重试而不是让整个授权流程崩掉
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 1500 * attempt))
+    }
   }
+  throw lastErr
 }
 
 const start = await post('https://github.com/login/device/code', { client_id: clientId, scope })

@@ -69,8 +69,8 @@ await sleep(300)
 
 console.log('\n[1] 装载与首屏注入')
 await check('注册了 soul:identity 注入点', () => assert.equal(boot.sections.length, 1))
-await check('注册了 4 个工具与 /soul 命令', () => {
-  assert.deepEqual([...boot.tools.keys()].sort(), ['soul_forget', 'soul_recall', 'soul_reflect', 'soul_remember'])
+await check('注册了 5 个工具与 /soul 命令', () => {
+  assert.deepEqual([...boot.tools.keys()].sort(), ['soul_forget', 'soul_handoff', 'soul_recall', 'soul_reflect', 'soul_remember'])
   assert.ok(boot.commands.has('soul'))
 })
 await check('首屏人格块包含默认人格', () => {
@@ -95,6 +95,41 @@ await check('片段已落盘', async () => {
 await check('显式线索升格为长期记忆', async () => {
   const raw = await fs.readFile(path.join(dataDir, 'memory.jsonl'), 'utf8')
   assert.ok(raw.includes('侯昱晨'), '线索记忆没写进去')
+})
+
+// 回归：宿主真实事件形状（2026-10-25 线上片段恒为 0 的根因）
+// - user/message 的 data 里没有 turn 字段，只有 content 数组
+// - assistant/message 的 content 混着 reasoning 与 text 两种 part
+console.log('\n[2b] 被动捕获：真实事件形状（无 turn / 含 reasoning）')
+boot.emit('session/event', s1, {
+  type: 'user/message',
+  data: { content: [{ type: 'text', text: '真实形状：今天下雨了，你记得带伞吗' }], role: 'user' },
+})
+boot.emit('session/event', s1, {
+  type: 'assistant/message',
+  data: {
+    turn: 2,
+    step: 1,
+    message: {
+      role: 'assistant',
+      content: [
+        { type: 'reasoning', text: '内心独白：先想想他为什么这么问' },
+        { type: 'text', text: '带伞这件事交给我，明天出门前提醒你。' },
+      ],
+    },
+  },
+})
+boot.emit('session/event', s1, { type: 'turn/end', data: { turn: 2 } })
+await sleep(300)
+
+await check('真实形状也能落片段', async () => {
+  const raw = await fs.readFile(path.join(dataDir, 'episodes.jsonl'), 'utf8')
+  assert.ok(raw.includes('真实形状：今天下雨了'), '片段里没有用户原话')
+  assert.ok(raw.includes('带伞这件事交给我'), '片段里没有我的回答')
+})
+await check('片段只收正文，不收 reasoning', async () => {
+  const raw = await fs.readFile(path.join(dataDir, 'episodes.jsonl'), 'utf8')
+  assert.ok(!raw.includes('内心独白'), 'reasoning 被当成回答写进片段了')
 })
 
 console.log('\n[3] 注入稳定性（前缀缓存友好）')

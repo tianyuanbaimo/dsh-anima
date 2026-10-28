@@ -7,14 +7,21 @@
 #
 # Every own config key is listed here, so a later layer can override a single
 # key and keep the rest of these defaults:
-#   inject           inject "persona + memory" into the system prompt
-#   promptMaxChars   character budget of the injected block
-#   injectMemories   how many memories stay resident in every request
-#   injectEpisodes   how many recent episodes stay resident
-#   captureEpisodes  compress finished turns into episodes
-#   captureCues      promote explicit cues ("remember this", "I prefer…") to long-term memory
-#   sectionOrder     position of the soul block in the system prompt (10050: after host docs, before Web surface)
-#   dataDir          data directory, default ~/.dsh/anima ($DSH_HOME wins)
+#   inject            inject "persona + memory" into the system prompt
+#   promptMaxChars    character budget of the injected block
+#   injectMemories    how many memories stay resident in every request
+#   injectRelevant    how many topic-related memories are added per session (0 disables)
+#   injectEpisodes    how many recent episodes stay resident
+#   captureEpisodes   compress finished turns into episodes
+#   captureCues       promote explicit cues ("remember this", "I prefer…") to long-term memory
+#   autoConsolidate   merge near-duplicate memories once the store grows past consolidateAt
+#   consolidateAt     live-memory count that triggers the automatic merge
+#   decayDays         days after which a low-weight, rarely-recalled memory goes dormant
+#   handoffAt         context pressure (0–1) that arms an automatic project handoff (0.95 = 95%)
+#   autoHandoff       generate the handoff automatically once the armed project finishes a turn
+#   handoffNewSession try to open a fresh project session for the handoff (host may refuse)
+#   sectionOrder      position of the soul block in the system prompt (10050: after host docs, before Web surface)
+#   dataDir           data directory, default ~/.dsh/anima ($DSH_HOME wins)
 - insert:
     - id: soul
       name: dsh-anima
@@ -22,8 +29,15 @@
         inject: true
         promptMaxChars: 4000
         injectMemories: 24
+        injectRelevant: 6
         injectEpisodes: 6
         captureEpisodes: true
         captureCues: true
+        autoConsolidate: true
+        consolidateAt: 300
+        decayDays: 120
+        handoffAt: 0.95
+        autoHandoff: true
+        handoffNewSession: true
         sectionOrder: 10050
         dataDir: ""
