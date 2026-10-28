@@ -53,12 +53,12 @@
       },
       "versions": [
         {
-          "version": "0.1.0",
-          "publishTimestamp": 1792902634,
+          "version": "0.3.0",
+          "publishTimestamp": 1793198785,
           "source": {
             "type": "git",
             "url": "https://github.com/tianyuanbaimo/dsh-anima",
-            "commit": "0b60ba4e49d7f5f5b7b47d220a38304333faf516"
+            "commit": "b1bf6a9ae23d9521de7b5ea019edc1e43aa22978"
           },
           "engines": {
             "dsh": ">=0.2.0"
