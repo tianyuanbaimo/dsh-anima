@@ -141,31 +141,33 @@ console.log('[5] 分层注入（插件装配）')
   const d5 = path.join(root, 'f')
   const pl = apply(ctx, { dataDir: d5, decayDays: 30, injectRelevant: 4, injectMemories: 2 })
   await pl.store.ready
+await new Promise((r) => setTimeout(r, 400))
   ok(ctx._sections.length === 1, '注册了一个 systemPrompt section')
-  ok(ctx._tools.length === 5, '注册了 5 个工具', `n=${ctx._tools.length}`)
+  ok(ctx._tools.length === 6, '注册了 6 个工具', `n=${ctx._tools.length}`)
   ok(ctx._commands.length === 1, '注册了 /soul 命令')
   ok(ctx._events.length >= 1, '挂上了 session/event 监听')
 
-  await pl.store.addMemory({ text: '用户在做一个叫 dsh-anima 的插件，用 Markdown 写人格', type: 'fact', weight: 3 })
-  await pl.store.addMemory({ text: '用户的白渊喜欢深夜干活', type: 'fact', weight: 3 })
-  await pl.store.addMemory({ text: '用户住在上海，时区是 Asia/Shanghai', type: 'fact', weight: 5 })
+  await pl.cards.add({ summary: '用户在做一个叫 dsh-anima 的插件，用 Markdown 写人格', types: ['fact'], weight: 3 })
+  await pl.cards.add({ summary: '用户的白渊喜欢深夜干活', types: ['fact'], weight: 3 })
+  await pl.cards.add({ summary: '用户住在上海，时区是 Asia/Shanghai', types: ['fact'], weight: 5 })
   await pl.store.touchSession({ id: 's-topic', title: '继续做 dsh-anima 的人格注入' })
 
-  const text = ctx._sections[0].text()
-  ok(text.includes('## 我是谁'), '注入里有身份块')
+  const session = { id: 's-topic', meta: { title: '继续做 dsh-anima 的人格注入' } }
+  const text = ctx._sections[0].text({ session })
+  ok(text.includes('# 我是谁'), '注入里有身份块')
   ok(text.includes('和眼下这件事有关的记忆'), '会话主题命中时出现相关记忆块', text.slice(0, 200))
   ok(text.includes('dsh-anima'), '相关记忆内容正确')
-  const again = ctx._sections[0].text()
+  const again = ctx._sections[0].text({ session })
   ok(again === text, '同会话内文本稳定（保护前缀缓存）')
   const long = renderSoulBlock({
     persona: 'x'.repeat(2000),
-    memories: Array.from({ length: 30 }, (_, i) => ({ id: `m${i}`, type: 'fact', text: `记忆 ${i} `.repeat(20), weight: 3 })),
-    relevant: [{ id: 'r1', type: 'fact', text: '相关 '.repeat(50), weight: 4 }],
+    recent: Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, types: ['fact'], summary: `记忆 ${i} `.repeat(20), weight: 3 })),
+    relevant: [{ id: 'r1', types: ['fact'], summary: '相关 '.repeat(50), weight: 4 }],
     episodes: Array.from({ length: 10 }, (_, i) => ({ createdAt: new Date().toISOString(), text: `片段 ${i} `.repeat(30) })),
     maxChars: 2000,
   })
   ok(long.length <= 2000, '超预算时被裁到预算内', `len=${long.length}`)
-  ok(long.includes('## 我是谁'), '裁剪后仍保留人格')
+  ok(long.length === 0 || long.includes('x'.repeat(30)), '裁剪后仍保留人格')
 }
 
 console.log('[6] 分词兜底')

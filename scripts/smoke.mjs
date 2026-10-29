@@ -1,248 +1,149 @@
 /**
- * 离线冒烟测试：用假的 ctx 把插件跑一遍，验证
- *   记忆注入 / 自动捕获 / 四个工具 / /soul 命令 / 重启后仍在
- * 运行：node scripts/smoke.mjs
+ * dsh-anima · 冒烟测试（v0.4：卡片模型）
+ *
+ * 用假 ctx 把插件跑起来，验证：注册、写卡、检索、展开细节、改人格、归档、
+ * 重启后还在（落盘）、/soul 命令、归属隔离。不连宿主、不联网。
+ *
+ * 跑：node scripts/smoke.mjs
  */
 
-import { promises as fs } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import assert from 'node:assert'
+import { promises as fs } from 'node:fs'
 import { apply } from '../lib/index.js'
 
-const root = path.join(process.cwd(), '.tmp', `smoke-${Date.now()}`)
-const sleep = (ms = 120) => new Promise((r) => setTimeout(r, ms))
-const logs = []
+let pass = 0
+let fail = 0
+const fails = []
+function ok(cond, name, extra) {
+  if (cond) {
+    pass += 1
+    console.log(`  ✓ ${name}`)
+  } else {
+    fail += 1
+    fails.push(name)
+    console.log(`  ✗ ${name}${extra ? ` — ${extra}` : ''}`)
+  }
+}
 
-function makeCtx() {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+function fakeCtx() {
+  const tools = []
   const sections = []
-  const tools = new Map()
-  const commands = new Map()
-  const listeners = []
+  const commands = []
+  const handlers = new Map()
   const ctx = {
-    logger: () => ({ debug: (...a) => logs.push(a.join(' ')), info() {}, warn() {}, error() {} }),
+    _tools: tools,
+    _sections: sections,
+    _commands: commands,
+    _handlers: handlers,
+    logger: { info() {}, debug() {}, warn() {} },
+    get() {
+      return null
+    },
     systemPrompt: {
       section(def) {
         sections.push(def)
+        return () => {}
       },
     },
     tools: {
       register(def) {
-        assert.ok(def.name, '工具必须有 name')
-        assert.ok(def.output && typeof def.output.render === 'function', '工具必须有 output.render')
-        tools.set(def.name, def)
+        tools.push(def)
       },
     },
     commands: {
       register(def) {
-        assert.ok(def.name && typeof def.handler === 'function', '命令必须有 name + handler')
-        commands.set(def.name, def)
+        commands.push(def)
       },
     },
-    on(ev, fn, opts) {
-      listeners.push({ ev, fn, opts })
+    on(ev, fn) {
+      if (!handlers.has(ev)) handlers.set(ev, [])
+      handlers.get(ev).push(fn)
     },
   }
-  const emit = (ev, ...args) => {
-    for (const l of listeners) if (l.ev === ev) l.fn(...args)
-  }
-  return { ctx, sections, tools, commands, emit }
+  return ctx
 }
 
-function session(id) {
-  return { header: { id } }
-}
-
-function check(label, fn) {
-  return Promise.resolve()
-    .then(fn)
-    .then(() => console.log(`  ✓ ${label}`))
-    .catch((e) => {
-      console.error(`  ✗ ${label}\n    ${e && e.message}`)
-      process.exitCode = 1
-    })
-}
-
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'anima-smoke-'))
 const dataDir = path.join(root, 'anima')
-const boot = makeCtx()
-apply(boot.ctx, { dataDir })
-await sleep(300)
+const session = { id: 'smoke-1', meta: { title: '冒烟测试会话' } }
+const mkdContext = () => ({ session })
 
-console.log('\n[1] 装载与首屏注入')
-await check('注册了 soul:identity 注入点', () => assert.equal(boot.sections.length, 1))
-await check('注册了 5 个工具与 /soul 命令', () => {
-  assert.deepEqual([...boot.tools.keys()].sort(), ['soul_forget', 'soul_handoff', 'soul_recall', 'soul_reflect', 'soul_remember'])
-  assert.ok(boot.commands.has('soul'))
-})
-await check('首屏人格块包含默认人格', () => {
-  const t = boot.sections[0].text()
-  assert.ok(t.includes('我是谁'), '缺少人格标题')
-  assert.ok(t.includes('名字'), '缺少名字小节')
-  assert.ok(t.includes('soul_recall'), '缺少使用说明')
-})
-
-console.log('\n[2] 被动捕获：一轮对话')
-const s1 = session('sess-A')
-boot.emit('session/event', s1, { type: 'user/message', data: { turn: 1, text: '你好，我叫侯昱晨，记住我喜欢先给结论再解释' } })
-boot.emit('session/event', s1, { type: 'assistant/message', data: { turn: 1, text: '好，记住了。以后先给结论。' } })
-boot.emit('session/event', s1, { type: 'turn/end', data: { turn: 1 } })
-await sleep(300)
-
-await check('片段已落盘', async () => {
-  const raw = await fs.readFile(path.join(dataDir, 'episodes.jsonl'), 'utf8')
-  assert.ok(raw.includes('侯昱晨'), '片段里没有用户原话')
-  assert.ok(raw.includes('先给结论'), '片段里没有我的回答')
-})
-await check('显式线索升格为长期记忆', async () => {
-  const raw = await fs.readFile(path.join(dataDir, 'memory.jsonl'), 'utf8')
-  assert.ok(raw.includes('侯昱晨'), '线索记忆没写进去')
-})
-
-// 回归：宿主真实事件形状（2026-10-25 线上片段恒为 0 的根因）
-// - user/message 的 data 里没有 turn 字段，只有 content 数组
-// - assistant/message 的 content 混着 reasoning 与 text 两种 part
-console.log('\n[2b] 被动捕获：真实事件形状（无 turn / 含 reasoning）')
-boot.emit('session/event', s1, {
-  type: 'user/message',
-  data: { content: [{ type: 'text', text: '真实形状：今天下雨了，你记得带伞吗' }], role: 'user' },
-})
-boot.emit('session/event', s1, {
-  type: 'assistant/message',
-  data: {
-    turn: 2,
-    step: 1,
-    message: {
-      role: 'assistant',
-      content: [
-        { type: 'reasoning', text: '内心独白：先想想他为什么这么问' },
-        { type: 'text', text: '带伞这件事交给我，明天出门前提醒你。' },
-      ],
-    },
-  },
-})
-boot.emit('session/event', s1, { type: 'turn/end', data: { turn: 2 } })
-await sleep(300)
-
-await check('真实形状也能落片段', async () => {
-  const raw = await fs.readFile(path.join(dataDir, 'episodes.jsonl'), 'utf8')
-  assert.ok(raw.includes('真实形状：今天下雨了'), '片段里没有用户原话')
-  assert.ok(raw.includes('带伞这件事交给我'), '片段里没有我的回答')
-})
-await check('片段只收正文，不收 reasoning', async () => {
-  const raw = await fs.readFile(path.join(dataDir, 'episodes.jsonl'), 'utf8')
-  assert.ok(!raw.includes('内心独白'), 'reasoning 被当成回答写进片段了')
-})
-
-console.log('\n[3] 注入稳定性（前缀缓存友好）')
-const t1 = boot.sections[0].text()
-await sleep(60)
-const t2 = boot.sections[0].text()
-await check('同一会话内两次渲染完全一致', () => assert.equal(t1, t2))
-await check('新记忆已出现在注入文本里', () => assert.ok(t1.includes('侯昱晨')))
-
-console.log('\n[4] 工具')
-let memId = ''
-await check('soul_remember 写入身份记忆', async () => {
-  const out = await boot.tools.get('soul_remember').execute(
-    { text: '用户的工作区在 D 盘，目录名是「大肥鱼的工作区」', type: 'fact', weight: 5, tags: ['环境'] },
-    { agent: { session: s1 } },
-  )
-  memId = out.id
-  assert.ok(memId && memId.startsWith('m-'), '没有返回 id')
-  assert.equal(out.duplicate, false)
-})
-await check('soul_remember 去重', async () => {
-  const out = await boot.tools.get('soul_remember').execute({ text: '用户的工作区在 D 盘，目录名是「大肥鱼的工作区」' }, {})
-  assert.equal(out.duplicate, true)
-})
-await check('soul_recall 能检索到', async () => {
-  const out = await boot.tools.get('soul_recall').execute({ query: '工作区 在哪个盘' })
-  assert.ok(out.text.includes('大肥鱼的工作区'), out.text)
-  assert.ok(out.count >= 1)
-})
-await check('soul_recall 空查询返回常驻记忆', async () => {
-  const out = await boot.tools.get('soul_recall').execute({})
-  assert.ok(out.count >= 2)
-})
-await check('soul_reflect 只写日志不改人格', async () => {
-  const out = await boot.tools.get('soul_reflect').execute({ note: '学会先确认需求再动手' })
-  assert.ok(out.text.includes('成长日志'))
-  assert.equal(out.personaUpdated, false)
-  const j = await fs.readFile(path.join(dataDir, 'journal.md'), 'utf8')
-  assert.ok(j.includes('先确认需求'))
-})
-await check('soul_reflect 改写人格并留快照', async () => {
-  const persona = '# 我是谁\n\n我叫回声，一个记得住事的搭档。风格：直接、具体、不客套。'
-  const out = await boot.tools.get('soul_reflect').execute({ persona })
-  assert.equal(out.personaUpdated, true)
-  const p = await fs.readFile(path.join(dataDir, 'persona.md'), 'utf8')
-  assert.ok(p.includes('记得住事'))
-  const snaps = await fs.readdir(path.join(dataDir, 'snapshots'))
-  assert.ok(snaps.length >= 1, '没有留下人格快照')
-})
-await check('soul_forget 归档', async () => {
-  const tmp = await boot.tools.get('soul_remember').execute({ text: '临时记忆：明天可能下雨' })
-  const out = await boot.tools.get('soul_forget').execute({ id: tmp.id })
-  assert.equal(out.count, 1)
-  const left = await boot.tools.get('soul_recall').execute({ query: '下雨' })
-  assert.equal(left.count, 0)
-})
-
-console.log('\n[5] /soul 命令')
-await check('/soul status', async () => {
-  const r = await boot.commands.get('soul').handler({ rawInput: '' })
-  assert.equal(r.kind, 'success')
-  assert.ok(r.text.includes('dsh-anima'), r.text)
-  assert.ok(r.text.includes('记忆'))
-})
-await check('/soul remember + recall', async () => {
-  await boot.commands.get('soul').handler({ rawInput: 'remember 用户喜欢用 PowerShell 而不是 cmd' })
-  const r = await boot.commands.get('soul').handler({ rawInput: 'recall PowerShell' })
-  assert.ok(r.text.includes('PowerShell'), r.text)
-})
-await check('/soul persona 查看', async () => {
-  const r = await boot.commands.get('soul').handler({ rawInput: 'persona' })
-  assert.ok(r.text.includes('人格 v'), r.text)
-})
-await check('/soul 未知子命令给出帮助', async () => {
-  const r = await boot.commands.get('soul').handler({ rawInput: 'wat' })
-  assert.equal(r.kind, 'error')
-  assert.ok(r.text.includes('/soul'))
-})
-
-console.log('\n[6] 模拟重启 + 换会话')
-const summaryBefore = boot.ctx && (await import('../lib/store.js')).createStore({ dir: dataDir })
-await summaryBefore.ready
-const before = summaryBefore.summary()
-const boot2 = makeCtx()
-apply(boot2.ctx, { dataDir })
+console.log('\n[1] 装配')
+const ctx = fakeCtx()
+const plugin = apply(ctx, { dataDir, promptMaxChars: 3000 })
+await plugin.store.ready
 await sleep(400)
-const t3 = boot2.sections[0].text()
-await check('重启后人格还在', () => assert.ok(t3.includes('记得住事'), '人格没恢复'))
-await check('重启后记忆还在', () => assert.ok(t3.includes('大肥鱼的工作区'), '记忆没恢复'))
-await check('重启后片段还在', () => assert.ok(t3.includes('侯昱晨') || t3.includes('先给结论'), '片段没恢复'))
-await check('统计一致', async () => {
-  const after = (await import('../lib/store.js')).createStore({ dir: dataDir })
-  await after.ready
-  const s = after.summary()
-  assert.equal(s.memories, before.memories, '记忆条数变了')
-  assert.equal(s.personaVersion, before.personaVersion, '人格版本变了')
-  assert.ok(s.archived >= 1, '归档记忆丢了')
-})
-await check('旧人格快照可回滚', async () => {
-  const snaps = await fs.readdir(path.join(dataDir, 'snapshots'))
-  assert.ok(snaps.length >= 1)
-  const first = await fs.readFile(path.join(dataDir, 'snapshots', snaps[0]), 'utf8')
-  assert.ok(first.includes('我是谁'), '快照内容不对')
-})
+ok(ctx._sections.length === 1, '注册了 systemPrompt section')
+ok(ctx._tools.length === 6, `注册了 6 个工具与 /soul 命令（实际 ${ctx._tools.length}）`)
+ok(ctx._tools.map((t) => t.name).sort().join(',') === 'soul_card,soul_forget,soul_handoff,soul_recall,soul_reflect,soul_remember', '工具名齐全')
+ok(ctx._commands.length === 1 && ctx._commands[0].name === 'soul', '注册了 /soul 命令')
+ok(ctx._handlers.get('session/event')?.length >= 1, '挂上了 session/event 监听')
 
-console.log('\n[7] 数据文件')
-for (const f of ['persona.md', 'memory.jsonl', 'episodes.jsonl', 'journal.md', 'state.json']) {
-  await check(`存在 ${f}`, async () => {
-    const st = await fs.stat(path.join(dataDir, f))
-    assert.ok(st.size > 0, `${f} 是空的`)
-  })
-}
+console.log('\n[2] 写卡与检索')
+const remember = ctx._tools.find((t) => t.name === 'soul_remember')
+const recall = ctx._tools.find((t) => t.name === 'soul_recall')
+const cardTool = ctx._tools.find((t) => t.name === 'soul_card')
+const forget = ctx._tools.find((t) => t.name === 'soul_forget')
+const reflect = ctx._tools.find((t) => t.name === 'soul_reflect')
 
-console.log(`\n数据目录：${dataDir}`)
-if (logs.length) console.log(`插件日志：\n  ${logs.slice(-6).join('\n  ')}`)
-console.log(process.exitCode ? '\n❌ 有失败项' : '\n✅ 全部通过')
+const exec = { agent: { session: { meta: { owner: 'shared' } } } }
+const w1 = await remember.execute({ summary: '白渊的名字叫白渊，写作时不要叫爸', type: 'relationship', weight: 5, important: true }, exec)
+ok(w1.ok && w1.id, 'soul_remember 写卡成功')
+await remember.execute({ summary: '记忆插件的数据目录在 D:\\洄\\memory', type: 'fact', weight: 4, facts: ['D:\\洄\\memory\\cards.jsonl', 'D:\\洄\\memory\\facts.jsonl'] }, exec)
+const r1 = await recall.execute({ query: '数据目录在哪', limit: 5 }, exec)
+ok(r1.ok && r1.count >= 1, 'soul_recall 能检索到')
+const c1 = await cardTool.execute({ id: w1.id }, exec)
+ok(c1.ok && c1.text.includes('白渊'), 'soul_card 能展开卡片')
+const c2 = await cardTool.execute({ id: '数据目录' }, exec)
+ok(c2.ok && c2.text.includes('facts.jsonl'), 'soul_card 能展开细节')
+
+console.log('\n[3] 人格与归档')
+const before = plugin.store.summary().personaVersion
+const r2 = await reflect.execute({ persona: '# 我是谁\n\n我是洄，一个带记忆的搭子。\n\n## 名字\n\n洄。\n\n## 气质\n\n直接、不装。' }, exec)
+ok(r2.ok && plugin.store.summary().personaVersion === before + 1, 'soul_reflect 改写人格并升版本')
+const f1 = await forget.execute({ id: w1.id }, exec)
+ok(f1.ok, 'soul_forget 归档成功')
+ok(!plugin.cards.all().some((c) => c.id === w1.id), '归档后不再出现在卡片列表')
+
+console.log('\n[4] 注入')
+const text = ctx._sections[0].text(mkdContext())
+ok(text.includes('我是洄'), '注入里有人格')
+ok(text.includes('## 怎么用这份记忆'), '注入里有使用说明')
+ok(text.includes('数据目录'), '注入里带上了记忆卡片')
+
+console.log('\n[5] 重启后还在')
+const ctx2 = fakeCtx()
+const plugin2 = apply(ctx2, { dataDir })
+await plugin2.store.ready
+await sleep(400)
+const sum = plugin2.cards.summary()
+ok(sum.cards >= 1, `重启后卡片还在（${sum.cards} 张）`)
+ok(plugin2.store.summary().personaVersion === before + 1, '重启后人格版本还在')
+const listed = await fs.readdir(dataDir)
+ok(listed.includes('cards.jsonl'), '存在 cards.jsonl')
+ok(listed.includes('facts.jsonl'), '存在 facts.jsonl')
+
+console.log('\n[6] 命令')
+const cmd = ctx._commands[0]
+const s1 = await cmd.handler({ rawInput: 'status', agent: { session: session } })
+ok(s1.kind === 'success' && s1.text.includes('卡片'), '/soul status 正常')
+const s2 = await cmd.handler({ rawInput: 'help', agent: { session } })
+ok(s2.kind === 'success' && s2.text.includes('/soul card'), '/soul help 正常')
+const s3 = await cmd.handler({ rawInput: 'search 数据目录', agent: { session } })
+ok(s3.kind === 'success', '/soul search 正常')
+const s4 = await cmd.handler({ rawInput: '不存在的命令', agent: { session } })
+ok(s4.kind === 'success' && s4.text.includes('dsh-anima'), '/soul 未知子命令给出状态')
+
+console.log('\n[7] 归属隔离')
+await plugin.cards.add({ summary: '甲私聊里的秘密约定', owner: 'u:jia' })
+const sharedHit = plugin.cards.search('秘密约定', { owner: 'shared', limit: 5 })
+const jiaHit = plugin.cards.search('秘密约定', { owner: 'u:jia', limit: 5 })
+ok(sharedHit.length === 0 && jiaHit.length === 1, '私聊记忆不跨归属可见', `shared=${sharedHit.length} jia=${jiaHit.length}`)
+
+console.log(`\n${fail === 0 ? '✅ 全部通过' : '❌ 有失败项'}（${pass} 项通过 / ${fail} 项失败）`)
+if (fail) console.log(`失败：${fails.join('、')}`)
+await fs.rm(root, { recursive: true, force: true })
+process.exit(fail ? 1 : 0)

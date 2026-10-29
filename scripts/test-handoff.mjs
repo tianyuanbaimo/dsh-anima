@@ -84,7 +84,7 @@ const { ctx, sections, commands, handlers } = makeCtx({ usedRef, created })
 
 const plugin = apply(ctx, { dataDir, handoffAt: 0.9, autoConsolidate: false, captureEpisodes: true })
 await plugin.store.ready
-
+await new Promise((r) => setTimeout(r, 400))
 const A = { header: { id: 'sess-A', cwd: 'D:\\demo' } }
 
 // ---- 1. 水位没到：不该警戒 ----
@@ -182,6 +182,7 @@ target9: {
   const dir2 = path.join(root, 'anima2')
   const p2 = apply(m2.ctx, { dataDir: dir2, autoHandoff: false, autoConsolidate: false })
   await p2.store.ready
+await new Promise((r) => setTimeout(r, 400))
   const C = { header: { id: 'sess-C' } }
   await fire(m2.handlers, C, { type: 'request/context', data: { contextWindow: 1000 } })
   await fire(m2.handlers, C, { type: 'user/message', data: { content: [{ type: 'text', text: '随便聊聊' }] } })

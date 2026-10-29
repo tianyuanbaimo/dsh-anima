@@ -1,43 +1,33 @@
-# dsh-anima bundle patch
-#
-# This layer inserts the plugin row into a profile's plugin roster; it is
-# declared by package.json `dsh.bundle.patch`. The row `name` is the package
-# name: the host half comes from exports["."] (lib/index.js) and runs inside the
-# DSH process. There is no client half, so `dsh.client` is not declared.
-#
-# Every own config key is listed here, so a later layer can override a single
-# key and keep the rest of these defaults:
-#   inject            inject "persona + memory" into the system prompt
-#   promptMaxChars    character budget of the injected block
-#   injectMemories    how many memories stay resident in every request
-#   injectRelevant    how many topic-related memories are added per session (0 disables)
-#   injectEpisodes    how many recent episodes stay resident
-#   captureEpisodes   compress finished turns into episodes
-#   captureCues       promote explicit cues ("remember this", "I prefer…") to long-term memory
-#   autoConsolidate   merge near-duplicate memories once the store grows past consolidateAt
-#   consolidateAt     live-memory count that triggers the automatic merge
-#   decayDays         days after which a low-weight, rarely-recalled memory goes dormant
-#   handoffAt         context pressure (0–1) that arms an automatic project handoff (0.95 = 95%)
-#   autoHandoff       generate the handoff automatically once the armed project finishes a turn
-#   handoffNewSession try to open a fresh project session for the handoff (host may refuse)
-#   sectionOrder      position of the soul block in the system prompt (10050: after host docs, before Web surface)
-#   dataDir           data directory, default ~/.dsh/anima ($DSH_HOME wins)
+# dsh-anima 的 bundle 补丁层：把插件作为一行插进 profile。
+# name 必须是【裸包名】dsh-anima；dataDir 留空时用 $DSH_HOME/anima（一般是 ~/.dsh/anima）。
 - insert:
     - id: soul
       name: dsh-anima
       config:
+        dataDir: ""
         inject: true
         promptMaxChars: 4000
-        injectMemories: 24
-        injectRelevant: 6
+        # 记忆注入的硬预算（字）：超了就按 相关 → 最近 → 重要 的顺序砍
+        memBudget: 2000
+        injectRelevant: 3
+        recentCards: 5
+        importantCards: 8
         injectEpisodes: 6
         captureEpisodes: true
         captureCues: true
+        # 5 分钟没消息就把当前话题压成一张卡
+        idleWriteMs: 300000
         autoConsolidate: true
         consolidateAt: 300
         decayDays: 120
+        # 上下文水位到 95% 时，等这一轮收尾后生成项目交接
         handoffAt: 0.95
         autoHandoff: true
         handoffNewSession: true
+        # 32K tokens 触发转生：交接 + 新会话，新会话开头读一次交接
+        rebirthAt: 32000
+        # 可选重排后端（本地 Ollama）；留空 = 只用三因子打分
+        rerankModel: ""
+        rerankBase: "http://127.0.0.1:11434"
+        rerankTimeoutMs: 2000
         sectionOrder: 10050
-        dataDir: ""

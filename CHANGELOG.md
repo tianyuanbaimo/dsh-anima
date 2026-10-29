@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+摘要索引 + 细节外挂：
+
+- 数据模型：cards.jsonl 存卡片（标题/摘要/实体/关键词/类型/归属/权重），facts.jsonl 存挂在卡下的细节；不存聊天原文切片，细节按需用 soul_card 展开；旧 memory.jsonl 首次启动自动迁移。
+- 写入流水线：显式"记住…"立刻落卡；话题终结（相邻两轮词重叠 < 0.12）与 5 分钟空闲（idleWriteMs）把话题压成一张卡；低信息量闲聊不占卡；关键词兜底判类型；≥0.85 相似度合并去重。
+- 读取三路：人格 + 最近 5 张卡 + 相关 Top-3（检索 Top-10 → 可选本地小模型重排 → 取 3），2000 字硬预算；重排带 10 分钟缓存、2 秒超时降级、启动预热。
+- 归属隔离：每张卡带 owner，私聊卡在群里查不到。
+- 软遗忘：三因子（0.7 语义 / 0.2 新鲜 / 0.1 频率）；90 天没用、命中 <2、权重 ≤3、非重要的卡自动归档；rule 与 important 永不软遗忘。
+- 转生：上下文到 rebirthAt（默认 32000 tokens）时，本轮收尾后生成项目交接并新建下一个项目会话；新会话开头读一次交接。
+- 新工具 soul_card；新命令 /soul cards|card|stats|sweep；/soul status 改为卡片口径。
+- 自测 108 项全绿：smoke 24 / test-v4 31 / test-upgrade 32 / test-handoff 21。
+
 ## 0.3.0
 
 Project handoffs: when this context window is nearly full, the project gets wrapped up instead of losing the thread.

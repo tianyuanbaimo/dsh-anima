@@ -83,6 +83,25 @@ While armed, the block carries `## 上下文水位告警` telling the model to w
 
 > Opening the next project tries `ctx.sessions.create`; if the host refuses (a live session wants an agent handle) the handoff still lands on disk and the next session picks it up — no pretending.
 
+## Memory model (v0.4)
+
+Two layers, so the context carries compact summaries only:
+
+| layer | file | injected | purpose |
+| --- | --- | --- | --- |
+| card | `cards.jsonl` | summary only | title, one-line summary, entities, tags, type, owner, weight |
+| detail | `facts.jsonl` | no | quotes, numbers, paths, conclusions; expanded by `soul_card <id>` |
+
+Writes: an explicit "remember ..." becomes a card at once; a topic switch (low overlap between two turns) or five idle minutes (`idleWriteMs`) folds recent turns into one card; greetings are skipped; types are guessed from keywords (rule / preference / emotion / decision / relationship / fact); cards similar at >=0.85 are merged.
+
+Reads: persona + 5 recent cards + top 3 related cards (retrieve top 10, optional local rerank, keep 3) under a hard `memBudget` (2000 chars). Rerank has a 10-minute cache, a 2-second timeout, a startup warm-up, and falls back to plain scoring.
+
+Ownership: cards carry an `owner` (default `shared`, from session `meta.owner`); private cards are invisible to other owners. Soft forget archives cards unused for 90 days with low hits/weight; `important` and `rule` cards are never archived.
+
+Rebirth: at `rebirthAt` tokens (32000 default), after the current turn ends, the plugin writes a project handoff and starts the next project session, which reads the handoff once.
+
+New: `soul_card` tool; `/soul cards|card|stats|sweep`; `memBudget`, `recentCards`, `importantCards`, `idleWriteMs`, `rebirthAt`, `rerankModel`, `rerankBase`, `rerankTimeoutMs`.
+
 ## Memory upkeep (v0.2)
 
 Long-lived memory accumulates duplicates and dead weight. Two mechanisms run automatically, and **neither deletes anything**:

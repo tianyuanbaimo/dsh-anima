@@ -116,6 +116,25 @@ dsh plugin --profile desktop add "link:/path/to/dsh-anima"
 
 > 自动新建项目这一步会尝试 `ctx.sessions.create`；宿主若拒绝（活会话需要 agent 句柄），交接照样落盘，等你下次开会话时自动接上——不假装成功。
 
+## 记忆的形态（v0.4）
+
+记忆分两层，**摘要进上下文，细节等要用再取**：
+
+| 层 | 文件 | 进上下文吗 | 干什么 |
+| --- | --- | --- | --- |
+| 卡片 | `cards.jsonl` | 只进摘要 | 标题 + 一句话摘要 + 实体 + 类型 + 归属 + 权重 |
+| 细节 | `facts.jsonl` | 不进 | 挂在卡下的原话、数字、路径、结论；`soul_card <id>` 才展开 |
+
+**写入怎么触发**：说"记住…"立刻落卡；相邻两轮词重叠很低（换话题）或 5 分钟没消息，就把刚才那几轮压成一张卡；"嗯""好""哈哈"不占卡。类型靠关键词兜底判：必须遵守的 → `rule`，偏好 → `preference`，情绪 → `emotion`，拍板 → `decision`。写入前按 ≥0.85 相似度合并。
+
+**读取怎么节流**：每次装配最多 3 路 —— 人格（永远在）、最近 5 张卡、和眼下这件事相关的 Top-3（先检索 Top-10，再用本地小模型重排，2 秒超时或失败退回原排序）。总预算 `memBudget`（默认 2000 字），超了先砍"相关"、再砍"最近"，人格最后才动。
+
+**归属与遗忘**：每张卡有 `owner`（默认 `shared`，由会话 `meta.owner` 决定），私聊的卡在群里检索不到。90 天没用、没被引用、权重又低的卡软归档；`important` 和 `rule` 永不归档。
+
+**转生**：上下文到 `rebirthAt`（默认 32000 tokens）时，本轮收尾 → 写项目交接 → 新建下一个项目会话；新项目开头读一次交接（目标 / 决定 / 进度 / 待办 / 动过的路径），读完不再重复注入。
+
+新增工具 `soul_card`；新增命令 `/soul cards`、`/soul card <id>`、`/soul stats`、`/soul sweep`；新增配置 `memBudget`、`recentCards`、`importantCards`、`idleWriteMs`、`rebirthAt`、`rerankModel`、`rerankBase`、`rerankTimeoutMs`。
+
 ## 记忆整理与休眠（v0.2）
 
 记忆用久了会攒重复、堆无用条目。v0.2 加了两条自动机制，都**不删除任何内容**：
